@@ -1,5 +1,12 @@
-import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.codeInsight.CodeInsightActionHandler;
+import com.intellij.codeInsight.actions.CodeInsightAction;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
@@ -13,22 +20,63 @@ import java.util.regex.Pattern;
 /**
  * Created by chant on 16/12/23.
  */
-public class FindAttrValueAction extends AnAction {
+public class FindAttrValueAction extends CodeInsightAction {
 
+    @NotNull
     @Override
-    public void actionPerformed(AnActionEvent e) {
+    protected CodeInsightActionHandler getHandler() {
+        return new CodeInsightActionHandler() {
+            @Override
+            public void invoke(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile psiFile) {
+                /**
+                 * 1. 遍历所有文件的所有行找<item name="xxx"></item>
+                 * 2. 如果只有一个结果，直接跳转到这个文件的这一行
+                 * 3. 如果有多个结果，弹出菜单列出xxx，点击菜单项时跳转到这个文件的这一行
+                 */
 
-        /**
-         * 1. 遍历所有文件的所有行
-         * 2. 找 <item name="xxx"></item>
-         * 3. 如果只有一个结果，直接跳转到这个文件的这一行
-         * 4. 如果有多个结果，弹出菜单列出xxx，点击菜单项时跳转到这个文件的这一行
-         */
+                int caretOffset = editor.getCaretModel().getOffset();
+                PsiElement psiElement = psiFile.findElementAt(caretOffset);
+                if (psiElement != null) {
+                    String elementName = psiElement.getText();
+                    findAttrName(project, elementName);
+                }
+            }
 
-        final String filePath = "/Users/chant/android/qmuidemo_android/qmui/src/main/res/values/qmui_themes.xml";
-        final String attrName = "qmui_btn_text_size";
-        // 1. 遍历所有文件的所有行
-        List<String> matchLines = findAttrNameInFile(filePath, attrName);
+            @Override
+            public boolean startInWriteAction() {
+                return false;
+            }
+        };
+    }
+
+    private void findAttrName(Project project, String attrName) {
+        // 1. 遍历所有文件的所有行找<item name="xxx"></item>
+        // TODO 遍历所有 module，找所有module 下的 res/*
+        String[] filePaths = new String[] {
+                "/Users/chant/android/qmuidemo_android/qmui/src/main/res/values/qmui_themes.xml",
+                "/Users/chant/android/qmuidemo_android/qmui/src/main/res/values/qmui_themes_compat.xml"
+        };
+
+        List<String> allMatchesFile = new ArrayList<>();
+        for (String filePath : filePaths) {
+            List<String> matchLines = findAttrNameInFile(filePath, attrName);
+            if (matchLines.size() > 0) {
+                allMatchesFile.add(filePath);
+            }
+        }
+
+        if (allMatchesFile.size() == 1) {
+            openFile(project, allMatchesFile.get(0));
+        } else if (allMatchesFile.size() > 1) {
+            // TODO show menu and open file
+            openFile(project, allMatchesFile.get(0));
+        }
+    }
+
+    private void openFile(Project project, String filePath) {
+        FileEditorManager fileEditorManager = FileEditorManager.getInstance(project);
+        VirtualFile vf = LocalFileSystem.getInstance().findFileByPath(filePath);
+        fileEditorManager.openFile(vf, true, true);
     }
 
     private List<String> findAttrNameInFile(String filePath, String attrName) {
