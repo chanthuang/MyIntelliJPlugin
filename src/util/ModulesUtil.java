@@ -21,7 +21,6 @@ public class ModulesUtil {
 
     public ModulesUtil(Project project) {
         this.project = project;
-        getModules();
     }
 
     public Set<String> getModules() {
@@ -72,6 +71,26 @@ public class ModulesUtil {
             }
         }
         return null;
+    }
+
+    public Set<String> getAllValueFilesPath() {
+        Set<String> results = new HashSet<>();
+        Set<String> modules = getModules();
+        for (String moduleName : modules) {
+            PsiDirectory resDir = getResDir(moduleName);
+            if (resDir != null && resDir.isDirectory()) {
+                PsiDirectory valuesDir = resDir.findSubdirectory("values");
+                if (valuesDir != null && valuesDir.isDirectory()) {
+                    PsiFile[] files = valuesDir.getFiles();
+                    for (PsiFile file : files) {
+                        if (file.getName().endsWith(".xml")) {
+                            results.add(file.getVirtualFile().getPath());
+                        }
+                    }
+                }
+            }
+        }
+        return results;
     }
 
     public PsiDirectory getOrCreateDrawableDir(String moduleName,String dirName) {

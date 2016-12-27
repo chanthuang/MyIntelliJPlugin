@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/app_primary_color">
+
+    <com.tencent.qmui.widget.QMUITopBar
+        android:id="@+id/topbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/qmui_topbar_height"/>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?attr/qmui_topbar_height"
+        android:paddingTop="20dp"
+        android:background="@color/qmui_config_color_white">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/QDCommonDescription"
+                android:text="@string/floatLayout_tip"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:padding="20dp"
+                android:background="@color/qmui_config_color_gray_7"
+                android:text="子元素左对齐的FloatLayout"
+                android:textColor="@color/qmui_config_color_gray_5"
+                android:textSize="14sp" />
+
+            <com.tencent.qmui.widget.QMUIFloatLayout
+                android:id="@+id/qmuidemo_floatlayout_left"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:childHorizontalSpacing="20dp"
+                app:childVerticalSpacing="20dp"
+                android:gravity="left"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/qmui_config_color_gray_7"
+                android:gravity="center_horizontal"
+                android:padding="20dp"
+                android:text="子元素居中对齐的FloatLayout"
+                android:textColor="@color/qmui_config_color_gray_5"
+                android:textSize="14sp" />
+
+            <com.tencent.qmui.widget.QMUIFloatLayout
+                android:id="@+id/qmuidemo_floatlayout_center"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:childHorizontalSpacing="20dp"
+                app:childVerticalSpacing="20dp"
+                android:gravity="center_horizontal"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:padding="20dp"
+                android:background="@color/qmui_config_color_gray_7"
+                android:text="子元素右对齐的FloatLayout"
+                android:textColor="@color/qmui_config_color_gray_5"
+                android:textSize="14sp" />
+
+            <com.tencent.qmui.widget.QMUIFloatLayout
+                android:id="@+id/qmuidemo_floatlayout_right"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:childHorizontalSpacing="20dp"
+                app:childVerticalSpacing="20dp"
+                android:gravity="right"/>
+        </LinearLayout>
+
+    </ScrollView>
+</FrameLayout>

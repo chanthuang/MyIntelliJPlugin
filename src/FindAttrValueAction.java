@@ -8,12 +8,14 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
+import util.ModulesUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,6 +30,14 @@ public class FindAttrValueAction extends CodeInsightAction {
         return new CodeInsightActionHandler() {
             @Override
             public void invoke(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile psiFile) {
+
+                ModulesUtil modulesUtil = new ModulesUtil(project);
+
+                // TODO 判断是否 Android Project
+//                if (!modulesUtil.isAndroidProject()) {
+//                    return;
+//                }
+
                 /**
                  * 1. 遍历所有文件的所有行找<item name="xxx"></item>
                  * 2. 如果只有一个结果，直接跳转到这个文件的这一行
@@ -36,10 +46,14 @@ public class FindAttrValueAction extends CodeInsightAction {
 
                 int caretOffset = editor.getCaretModel().getOffset();
                 PsiElement psiElement = psiFile.findElementAt(caretOffset);
-                if (psiElement != null) {
-                    String elementName = psiElement.getText();
-                    findAttrName(project, elementName);
+                if (psiElement == null) {
+                    System.out.println("Error: psiElement == null");
+                    return;
                 }
+
+                String elementName = psiElement.getText();
+                Set<String> allValuesFilesPath = modulesUtil.getAllValueFilesPath();
+                findAttrName(project, allValuesFilesPath, elementName);
             }
 
             @Override
@@ -49,19 +63,28 @@ public class FindAttrValueAction extends CodeInsightAction {
         };
     }
 
-    private void findAttrName(Project project, String attrName) {
-        // 1. 遍历所有文件的所有行找<item name="xxx"></item>
-        // TODO 遍历所有 module，找所有module 下的 res/*
-        String[] filePaths = new String[] {
-                "/Users/chant/android/qmuidemo_android/qmui/src/main/res/values/qmui_themes.xml",
-                "/Users/chant/android/qmuidemo_android/qmui/src/main/res/values/qmui_themes_compat.xml"
-        };
+    private void findAttrName(Project project, Set<String> resFiles, String attrName) {
+        System.out.println("[findAttrName] attrName = " + attrName);
+
+        if (!attrName.startsWith("?attr/")) {
+            System.out.println("Error: attrName(" + attrName + ") is not starts with ?attr/");
+            return;
+        } else {
+            attrName = attrName.replace("?attr/", "");
+        }
 
         List<String> allMatchesFile = new ArrayList<>();
-        for (String filePath : filePaths) {
+        for (String filePath : resFiles) {
             List<String> matchLines = findAttrNameInFile(filePath, attrName);
             if (matchLines.size() > 0) {
                 allMatchesFile.add(filePath);
+                StringBuilder sb = new StringBuilder("match: --- ");
+                for (String line : matchLines) {
+                    sb.append("\n").append(line);
+                }
+                System.out.println(sb);
+            } else {
+                System.out.println("Not match");
             }
         }
 
@@ -69,7 +92,9 @@ public class FindAttrValueAction extends CodeInsightAction {
             openFile(project, allMatchesFile.get(0));
         } else if (allMatchesFile.size() > 1) {
             // TODO show menu and open file
-            openFile(project, allMatchesFile.get(0));
+            for (String filePath : allMatchesFile) {
+                openFile(project, filePath);
+            }
         }
     }
 
@@ -80,6 +105,8 @@ public class FindAttrValueAction extends CodeInsightAction {
     }
 
     private List<String> findAttrNameInFile(String filePath, String attrName) {
+        System.out.println("[findAttrNameInFile] filePath=" + filePath + ", attrName=" + attrName);
+
         List<String> lines = new ArrayList<>();
         if (filePath == null || attrName == null) {
             return lines;
@@ -91,19 +118,19 @@ public class FindAttrValueAction extends CodeInsightAction {
             while ((line = bufReader.readLine()) != null) {
                 String lineAttrName = getNameFromLine(line);
                 if (lineAttrName.length() > 0) {
-                    System.out.println("attr=" + lineAttrName + " ---> " + line);
+//                    System.out.println("attr=" + lineAttrName + " ---> " + line);
                     if (lineAttrName.equals(attrName)) {
                         lines.add(line);
                     }
                 } else {
-                    System.out.println("不能识别 ---> " + line);
+//                    System.out.println("不能识别 ---> " + line);
                 }
 
             }
 
 //        return lines;
         } catch (Exception exception) {
-            System.out.println("error findAttrNameInFile: " + exception.getMessage());
+            System.out.println("Error: findAttrNameInFile: " + exception.getMessage());
         }
         return lines;
     }
