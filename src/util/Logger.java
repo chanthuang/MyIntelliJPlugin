@@ -51,10 +51,11 @@ public class Logger {
 
     private static String redirect(String text) {
         if (LEVEL == DEBUG) {
-            StackTraceElement ste = new Throwable().getStackTrace()[2];
-            String prefix = ste.getFileName();
-            int lineNum = ste.getLineNumber();
-            System.err.println("D/svgtoandroid: (" + prefix + ":" + lineNum + ") " + text);
+//            StackTraceElement ste = new Throwable().getStackTrace()[2];
+//            String prefix = ste.getFileName();
+//            int lineNum = ste.getLineNumber();
+//            System.err.println("D/HelloPlugin: (" + prefix + ":" + lineNum + ") " + text);
+            System.out.println(text);
         }
         return text;
     }

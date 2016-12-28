@@ -8,6 +8,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
+import util.Logger;
 import util.ModulesUtil;
 
 import java.io.BufferedReader;
@@ -31,6 +32,8 @@ public class FindAttrValueAction extends CodeInsightAction {
             @Override
             public void invoke(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile psiFile) {
 
+                Logger.init("chant", Logger.DEBUG);
+
                 ModulesUtil modulesUtil = new ModulesUtil(project);
 
                 // TODO 判断是否 Android Project
@@ -47,7 +50,7 @@ public class FindAttrValueAction extends CodeInsightAction {
                 int caretOffset = editor.getCaretModel().getOffset();
                 PsiElement psiElement = psiFile.findElementAt(caretOffset);
                 if (psiElement == null) {
-                    System.out.println("Error: psiElement == null");
+                    Logger.error("Error: psiElement == null");
                     return;
                 }
 
@@ -64,10 +67,10 @@ public class FindAttrValueAction extends CodeInsightAction {
     }
 
     private void findAttrName(Project project, Set<String> resFiles, String attrName) {
-        System.out.println("[findAttrName] attrName = " + attrName);
+        Logger.debug("[findAttrName] attrName = " + attrName);
 
         if (!attrName.startsWith("?attr/")) {
-            System.out.println("Error: attrName(" + attrName + ") is not starts with ?attr/");
+            Logger.error("Error: attrName(" + attrName + ") is not starts with ?attr/");
             return;
         } else {
             attrName = attrName.replace("?attr/", "");
@@ -82,9 +85,9 @@ public class FindAttrValueAction extends CodeInsightAction {
                 for (String line : matchLines) {
                     sb.append("\n").append(line);
                 }
-                System.out.println(sb);
+                Logger.debug(sb.toString());
             } else {
-                System.out.println("Not match");
+                Logger.debug("Not match");
             }
         }
 
@@ -105,7 +108,7 @@ public class FindAttrValueAction extends CodeInsightAction {
     }
 
     private List<String> findAttrNameInFile(String filePath, String attrName) {
-        System.out.println("[findAttrNameInFile] filePath=" + filePath + ", attrName=" + attrName);
+        Logger.debug("[findAttrNameInFile] filePath=" + filePath + ", attrName=" + attrName);
 
         List<String> lines = new ArrayList<>();
         if (filePath == null || attrName == null) {
@@ -130,7 +133,7 @@ public class FindAttrValueAction extends CodeInsightAction {
 
 //        return lines;
         } catch (Exception exception) {
-            System.out.println("Error: findAttrNameInFile: " + exception.getMessage());
+            Logger.error("Error: findAttrNameInFile: " + exception.getMessage());
         }
         return lines;
     }

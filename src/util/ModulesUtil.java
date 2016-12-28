@@ -42,11 +42,13 @@ public class ModulesUtil {
         return modules;
     }
 
-    public @Nullable String getCurrentModule() {
+    public
+    @Nullable
+    String getCurrentModule() {
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         String path = FileDocumentManager.getInstance().getFile(editor.getDocument()).getPath();
-        VirtualFile virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(path.substring(0,path.indexOf("/src")));
-        if (virtualFile!= null && virtualFile.isDirectory()) {
+        VirtualFile virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(path.substring(0, path.indexOf("/src")));
+        if (virtualFile != null && virtualFile.isDirectory()) {
             PsiDirectory directory = PsiDirectoryFactory.getInstance(project).createDirectory(virtualFile);
             if (isModule(directory)) {
                 return directory.getName();
@@ -77,14 +79,24 @@ public class ModulesUtil {
         Set<String> results = new HashSet<>();
         Set<String> modules = getModules();
         for (String moduleName : modules) {
-            PsiDirectory resDir = getResDir(moduleName);
-            if (resDir != null && resDir.isDirectory()) {
-                PsiDirectory valuesDir = resDir.findSubdirectory("values");
-                if (valuesDir != null && valuesDir.isDirectory()) {
-                    PsiFile[] files = valuesDir.getFiles();
-                    for (PsiFile file : files) {
-                        if (file.getName().endsWith(".xml")) {
-                            results.add(file.getVirtualFile().getPath());
+            PsiDirectory baseDir = PsiDirectoryFactory.getInstance(project).createDirectory(project.getBaseDir());
+            PsiDirectory moduleDir = baseDir.findSubdirectory(moduleName);
+            if (moduleDir != null && moduleDir.isDirectory()) {
+                PsiDirectory srcDir = moduleDir.findSubdirectory("src");
+                if (srcDir != null && srcDir.isDirectory()) {
+                    PsiDirectory mainDir = srcDir.findSubdirectory("main");
+                    if (mainDir != null && mainDir.isDirectory()) {
+                        PsiDirectory resDir = mainDir.findSubdirectory("res");
+                        if (resDir != null && resDir.isDirectory()) {
+                            PsiDirectory valuesDir = resDir.findSubdirectory("values");
+                            if (valuesDir != null && valuesDir.isDirectory()) {
+                                PsiFile[] files = valuesDir.getFiles();
+                                for (PsiFile file : files) {
+                                    if (file.getName().endsWith(".xml")) {
+                                        results.add(file.getVirtualFile().getPath());
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -93,7 +105,7 @@ public class ModulesUtil {
         return results;
     }
 
-    public PsiDirectory getOrCreateDrawableDir(String moduleName,String dirName) {
+    public PsiDirectory getOrCreateDrawableDir(String moduleName, String dirName) {
         PsiDirectory baseDir = PsiDirectoryFactory.getInstance(project).createDirectory(project.getBaseDir());
         PsiDirectory moduleDir = baseDir.findSubdirectory(moduleName);
         if (moduleDir != null) {
@@ -151,7 +163,6 @@ public class ModulesUtil {
         }
         return dpis;
     }
-
 
     private boolean isAndroidProject(PsiDirectory directory) {
         PsiFile[] files = directory.getFiles();
