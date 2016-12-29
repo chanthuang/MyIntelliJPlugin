@@ -1,14 +1,22 @@
 import com.intellij.codeInsight.CodeInsightActionHandler;
 import com.intellij.codeInsight.actions.CodeInsightAction;
+import com.intellij.notification.NotificationGroup;
+import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.MessageType;
+import com.intellij.openapi.ui.popup.Balloon;
+import com.intellij.openapi.ui.popup.BalloonBuilder;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.ui.awt.RelativePoint;
 import org.jetbrains.annotations.NotNull;
 import util.Logger;
 import util.ModulesUtil;
@@ -52,7 +60,12 @@ public class FindAttrValueAction extends CodeInsightAction {
                 List<LineMatchResult> allMatchLines = findAttrName(allValuesFilesPath, elementName);
 
                 if (allMatchLines.size() == 0) {
-                    // TODO Toast: Find nothing
+                    NotificationGroup NOTIFICATION_GROUP = NotificationGroup.balloonGroup("chant");
+                    NOTIFICATION_GROUP.createNotification("chant 报错",
+                            "没有找到 " + elementName + " 的赋值位置",
+                            NotificationType.ERROR,
+                            null
+                    ).notify(project);
                 } else if (allMatchLines.size() == 1) {
                     LineMatchResult fileMatchResult = allMatchLines.get(0);
                     openFile(project, fileMatchResult.filePath, fileMatchResult.lineIndex, fileMatchResult.startIndex);
@@ -71,7 +84,9 @@ public class FindAttrValueAction extends CodeInsightAction {
         };
     }
 
-    private @NotNull List<LineMatchResult> findAttrName(Set<String> resFiles, String attrName) {
+    private
+    @NotNull
+    List<LineMatchResult> findAttrName(Set<String> resFiles, String attrName) {
         Logger.debug("[findAttrName] attrName = " + attrName);
 
         if (!attrName.startsWith("?attr/")) {
