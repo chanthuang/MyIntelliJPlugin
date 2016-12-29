@@ -1,6 +1,8 @@
 import com.intellij.codeInsight.CodeInsightActionHandler;
 import com.intellij.codeInsight.actions.CodeInsightAction;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -11,10 +13,12 @@ import org.jetbrains.annotations.NotNull;
 import util.Logger;
 import util.ModulesUtil;
 
+import java.awt.*;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -45,7 +49,19 @@ public class FindAttrValueAction extends CodeInsightAction {
 
                 String elementName = psiElement.getText();
                 Set<String> allValuesFilesPath = modulesUtil.getAllValueFilesPath();
-                findAttrName(project, allValuesFilesPath, elementName);
+                List<LineMatchResult> allMatchLines = findAttrName(allValuesFilesPath, elementName);
+
+                if (allMatchLines.size() == 0) {
+                    // TODO Toast: Find nothing
+                } else if (allMatchLines.size() == 1) {
+                    LineMatchResult fileMatchResult = allMatchLines.get(0);
+                    openFile(project, fileMatchResult.filePath, fileMatchResult.lineIndex, fileMatchResult.startIndex);
+                } else if (allMatchLines.size() > 1) {
+                    // 弹出菜单选择要打开的文件
+                    LogicalPosition logicalPosition = editor.offsetToLogicalPosition(caretOffset);
+                    Point xy = editor.logicalPositionToXY(logicalPosition);
+                    showMenu(project, editor.getComponent(), xy.x, xy.y + editor.getLineHeight(), allMatchLines);
+                }
             }
 
             @Override
@@ -55,27 +71,25 @@ public class FindAttrValueAction extends CodeInsightAction {
         };
     }
 
-    private void findAttrName(Project project, Set<String> resFiles, String attrName) {
+    private @NotNull List<LineMatchResult> findAttrName(Set<String> resFiles, String attrName) {
         Logger.debug("[findAttrName] attrName = " + attrName);
 
         if (!attrName.startsWith("?attr/")) {
             Logger.error("Error: attrName(" + attrName + ") is not starts with ?attr/");
-            return;
+            return Collections.emptyList();
         } else {
             attrName = attrName.replace("?attr/", "");
         }
 
-        //  1. 遍历所有文件的所有行找<item name="attrName"></item>
+        //  1. 遍历所有文件的所有行找<item name="attrName">***</item>
         //  2. 如果只有一个结果，直接跳转到这个文件的这一行
-        //  3. 如果有多个结果，弹出菜单列出xxx，点击菜单项时跳转到这个文件的这一行
+        //  3. 如果有多个结果，弹出菜单列出来，点击菜单项时跳转到这个文件的这一行
 
-        List<String> allMatchesFile = new ArrayList<>();
-        List<List<LineMatchResult>> allMatchesLineInFile = new ArrayList<>();
+        List<LineMatchResult> allMatchLines = new ArrayList<>();
         for (String filePath : resFiles) {
             List<LineMatchResult> matchLines = findAttrNameInFile(filePath, attrName);
             if (matchLines.size() > 0) {
-                allMatchesFile.add(filePath);
-                allMatchesLineInFile.add(matchLines);
+                allMatchLines.addAll(matchLines);
 
                 Logger.debug("match: "
                         + "\t"
@@ -87,18 +101,22 @@ public class FindAttrValueAction extends CodeInsightAction {
             }
         }
 
-        if (allMatchesFile.size() == 1) {
-            String filePath = allMatchesFile.get(0);
-            LineMatchResult firstMatchLine = allMatchesLineInFile.get(0).get(0);
-            openFile(project, filePath, firstMatchLine.lineIndex, firstMatchLine.startIndex);
-        } else if (allMatchesFile.size() > 1) {
-            // TODO show menu and open file
-            for (int i = 0; i < allMatchesFile.size(); i++) {
-                String filePath = allMatchesFile.get(i);
-                LineMatchResult firstMatchLine = allMatchesLineInFile.get(i).get(0);
-                openFile(project, filePath, firstMatchLine.lineIndex, firstMatchLine.startIndex);
-            }
+        return allMatchLines;
+
+    }
+
+    private void showMenu(Project project, Component component, int x, int y, List<LineMatchResult> matchLines) {
+        DefaultActionGroup group = new DefaultActionGroup();
+        for (LineMatchResult line : matchLines) {
+            group.addAction(new AnAction(line.filePath, line.filePath, null) {
+                @Override
+                public void actionPerformed(AnActionEvent anActionEvent) {
+                    openFile(project, line.filePath, line.lineIndex, line.startIndex);
+                }
+            });
         }
+        ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.ANT_MESSAGES_POPUP, group);
+        menu.getComponent().show(component, x, y);
     }
 
     /**
@@ -134,6 +152,7 @@ public class FindAttrValueAction extends CodeInsightAction {
                     if (nameValue.length() > 0) {
                         if (nameValue.equals(attrName)) {
                             LineMatchResult lineResult = new LineMatchResult(
+                                    filePath,
                                     lineIndex,
                                     lineString,
                                     nameValue,
@@ -152,6 +171,10 @@ public class FindAttrValueAction extends CodeInsightAction {
 
     private static class LineMatchResult {
         /**
+         * 文件路径
+         */
+        String filePath;
+        /**
          * 在文件中的行号
          */
         int lineIndex;
@@ -168,7 +191,8 @@ public class FindAttrValueAction extends CodeInsightAction {
          */
         int startIndex;
 
-        LineMatchResult(int lineIndex, String lineString, String nameValue, int startIndex) {
+        LineMatchResult(String filePath, int lineIndex, String lineString, String nameValue, int startIndex) {
+            this.filePath = filePath;
             this.lineIndex = lineIndex;
             this.lineString = lineString;
             this.nameValue = nameValue;
