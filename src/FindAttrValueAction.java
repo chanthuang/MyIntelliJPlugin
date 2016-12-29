@@ -1,7 +1,7 @@
 import com.intellij.codeInsight.CodeInsightActionHandler;
 import com.intellij.codeInsight.actions.CodeInsightAction;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -36,17 +36,6 @@ public class FindAttrValueAction extends CodeInsightAction {
 
                 ModulesUtil modulesUtil = new ModulesUtil(project);
 
-                // TODO 判断是否 Android Project
-//                if (!modulesUtil.isAndroidProject()) {
-//                    return;
-//                }
-
-                /**
-                 * 1. 遍历所有文件的所有行找<item name="xxx"></item>
-                 * 2. 如果只有一个结果，直接跳转到这个文件的这一行
-                 * 3. 如果有多个结果，弹出菜单列出xxx，点击菜单项时跳转到这个文件的这一行
-                 */
-
                 int caretOffset = editor.getCaretModel().getOffset();
                 PsiElement psiElement = psiFile.findElementAt(caretOffset);
                 if (psiElement == null) {
@@ -76,78 +65,115 @@ public class FindAttrValueAction extends CodeInsightAction {
             attrName = attrName.replace("?attr/", "");
         }
 
+        //  1. 遍历所有文件的所有行找<item name="attrName"></item>
+        //  2. 如果只有一个结果，直接跳转到这个文件的这一行
+        //  3. 如果有多个结果，弹出菜单列出xxx，点击菜单项时跳转到这个文件的这一行
+
         List<String> allMatchesFile = new ArrayList<>();
+        List<List<LineMatchResult>> allMatchesLineInFile = new ArrayList<>();
         for (String filePath : resFiles) {
-            List<String> matchLines = findAttrNameInFile(filePath, attrName);
+            List<LineMatchResult> matchLines = findAttrNameInFile(filePath, attrName);
             if (matchLines.size() > 0) {
                 allMatchesFile.add(filePath);
-                StringBuilder sb = new StringBuilder("match: --- ");
-                for (String line : matchLines) {
-                    sb.append("\n").append(line);
-                }
-                Logger.debug(sb.toString());
+                allMatchesLineInFile.add(matchLines);
+
+                Logger.debug("match: "
+                        + "\t"
+                        + filePath
+                        + "matchLines="
+                        + String.valueOf(matchLines.size()));
             } else {
                 Logger.debug("Not match");
             }
         }
 
         if (allMatchesFile.size() == 1) {
-            openFile(project, allMatchesFile.get(0));
+            String filePath = allMatchesFile.get(0);
+            LineMatchResult firstMatchLine = allMatchesLineInFile.get(0).get(0);
+            openFile(project, filePath, firstMatchLine.lineIndex, firstMatchLine.startIndex);
         } else if (allMatchesFile.size() > 1) {
             // TODO show menu and open file
-            for (String filePath : allMatchesFile) {
-                openFile(project, filePath);
+            for (int i = 0; i < allMatchesFile.size(); i++) {
+                String filePath = allMatchesFile.get(i);
+                LineMatchResult firstMatchLine = allMatchesLineInFile.get(i).get(0);
+                openFile(project, filePath, firstMatchLine.lineIndex, firstMatchLine.startIndex);
             }
         }
     }
 
-    private void openFile(Project project, String filePath) {
-        FileEditorManager fileEditorManager = FileEditorManager.getInstance(project);
-        VirtualFile vf = LocalFileSystem.getInstance().findFileByPath(filePath);
-        fileEditorManager.openFile(vf, true, true);
+    /**
+     * 打开文件，移动光标到指定行号和指定列号
+     */
+    private void openFile(Project project, String filePath, int line, int column) {
+        VirtualFile file = LocalFileSystem.getInstance().findFileByPath(filePath);
+        if (file != null) {
+            new OpenFileDescriptor(project, file, line, column).navigate(true);
+        } else {
+            Logger.error("Error: [openFile] file from " + filePath + " is null");
+        }
     }
 
-    private List<String> findAttrNameInFile(String filePath, String attrName) {
+    private static final Pattern nameValuePattern = Pattern.compile("<item.*name ?= ?\\\"(.*?)\\\"");
+
+    private List<LineMatchResult> findAttrNameInFile(String filePath, String attrName) {
         Logger.debug("[findAttrNameInFile] filePath=" + filePath + ", attrName=" + attrName);
 
-        List<String> lines = new ArrayList<>();
+        List<LineMatchResult> lines = new ArrayList<>();
         if (filePath == null || attrName == null) {
             return lines;
         }
         try {
             File file = new File(filePath);
             BufferedReader bufReader = new BufferedReader(new FileReader(file));
-            String line;
-            while ((line = bufReader.readLine()) != null) {
-                String lineAttrName = getNameFromLine(line);
-                if (lineAttrName.length() > 0) {
-//                    System.out.println("attr=" + lineAttrName + " ---> " + line);
-                    if (lineAttrName.equals(attrName)) {
-                        lines.add(line);
+            String lineString;
+            int lineIndex = 0;
+            while ((lineString = bufReader.readLine()) != null) {
+                Matcher matcher = nameValuePattern.matcher(lineString);
+                if (matcher.find()) {
+                    String nameValue = matcher.group(1).trim();
+                    if (nameValue.length() > 0) {
+                        if (nameValue.equals(attrName)) {
+                            LineMatchResult lineResult = new LineMatchResult(
+                                    lineIndex,
+                                    lineString,
+                                    nameValue,
+                                    matcher.start(1));
+                            lines.add(lineResult);
+                        }
                     }
-                } else {
-//                    System.out.println("不能识别 ---> " + line);
                 }
-
+                lineIndex++;
             }
-
-//        return lines;
         } catch (Exception exception) {
             Logger.error("Error: findAttrNameInFile: " + exception.getMessage());
         }
         return lines;
     }
 
-    private static final Pattern pattern = Pattern.compile("<item.*name ?= ?\\\"(.*?)\\\"");
+    private static class LineMatchResult {
+        /**
+         * 在文件中的行号
+         */
+        int lineIndex;
+        /**
+         * 这一行的字符串
+         */
+        String lineString;
+        /**
+         * name属性的值
+         */
+        String nameValue;
+        /**
+         * name属性的值在这一行的 startIndex
+         */
+        int startIndex;
 
-    private
-    @NotNull
-    String getNameFromLine(String content) {
-        Matcher matcher = pattern.matcher(content);
-        if (matcher.find()) {
-            return matcher.group(1).trim();
+        LineMatchResult(int lineIndex, String lineString, String nameValue, int startIndex) {
+            this.lineIndex = lineIndex;
+            this.lineString = lineString;
+            this.nameValue = nameValue;
+            this.startIndex = startIndex;
         }
-        return "";
     }
 
 }
