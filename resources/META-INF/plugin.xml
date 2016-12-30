@@ -27,7 +27,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <!-- Add your extensions here -->
     <internalFileTemplate name="vector"/>
-    <applicationConfigurable instance="MyComponent"/>
+    <applicationConfigurable instance="Configuration"/>
   </extensions>
 
   <actions>

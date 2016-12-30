@@ -1,16 +1,11 @@
 package util;
 
-import com.google.common.base.Joiner;
-import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.LocalFileSystem;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.impl.file.PsiDirectoryFactory;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,8 +37,8 @@ public class ModulesUtil {
         return modules;
     }
 
-    private Set<PsiDirectory> getModuleValuesDir() {
-        Set<PsiDirectory> valuesDirs = new HashSet<>();
+    public List<PsiDirectory> getModuleValuesDir() {
+        List<PsiDirectory> valuesDirs = new ArrayList<>();
         Set<String> modules = getModules();
         for (String moduleName : modules) {
             PsiDirectory baseDir = PsiDirectoryFactory.getInstance(project).createDirectory(project.getBaseDir());
@@ -65,58 +60,6 @@ public class ModulesUtil {
             }
         }
         return valuesDirs;
-    }
-
-    private static final String CUSTOM_VALUES_DIR_KEY = "CustomValuesDirKey";
-    private static final String CUSTOM_VALUES_DIR_SEPARATOR = "_customValuesDirSeparator_";
-
-    public void setCustomValuesDirProperty(@Nullable List<String> filePaths) {
-        PropertiesComponent properties = PropertiesComponent.getInstance(project);
-        if (filePaths != null && filePaths.size() > 0) {
-            String value = Joiner.on(CUSTOM_VALUES_DIR_SEPARATOR).join(filePaths);
-            properties.setValue(CUSTOM_VALUES_DIR_KEY, value);
-        } else {
-            if (properties.isValueSet(CUSTOM_VALUES_DIR_KEY)) {
-                properties.unsetValue(CUSTOM_VALUES_DIR_KEY);
-            }
-        }
-    }
-
-    public
-    @NotNull
-    String[] getCustomValuesDirProperty() {
-        PropertiesComponent properties = PropertiesComponent.getInstance(project);
-        String valuesString = properties.getValue(CUSTOM_VALUES_DIR_KEY, "");
-        return valuesString.split(CUSTOM_VALUES_DIR_KEY);
-    }
-
-    private Set<PsiDirectory> getCustomValuesDir() {
-        Set<PsiDirectory> valuesDirs = new HashSet<>();
-        String[] filePaths = getCustomValuesDirProperty();
-        for (String filePath : filePaths) {
-            if (filePath != null && filePath.length() > 0) {
-                VirtualFile valuesDir = LocalFileSystem.getInstance().findFileByPath(filePath);
-                if (valuesDir != null && valuesDir.isDirectory()) {
-                    valuesDirs.add(PsiDirectoryFactory.getInstance(project).createDirectory(valuesDir));
-                }
-            }
-        }
-        return valuesDirs;
-    }
-
-    public Set<String> getAllValueFilesPath() {
-        Set<String> results = new HashSet<>();
-        Set<PsiDirectory> valuesDirs = getModuleValuesDir();
-        valuesDirs.addAll(getCustomValuesDir());
-        for (PsiDirectory valuesDir : valuesDirs) {
-            PsiFile[] files = valuesDir.getFiles();
-            for (PsiFile file : files) {
-                if (file.getName().endsWith(".xml")) {
-                    results.add(file.getVirtualFile().getPath());
-                }
-            }
-        }
-        return results;
     }
 
     public PsiDirectory getResDir(String moduleName) {

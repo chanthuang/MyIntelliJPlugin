@@ -13,9 +13,12 @@ import com.intellij.openapi.ui.popup.BalloonBuilder;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.impl.file.PsiDirectoryFactory;
 import com.intellij.ui.awt.RelativePoint;
 import org.jetbrains.annotations.NotNull;
 import util.Logger;
@@ -56,7 +59,8 @@ public class FindAttrValueAction extends CodeInsightAction {
                 }
 
                 String elementName = psiElement.getText();
-                Set<String> allValuesFilesPath = modulesUtil.getAllValueFilesPath();
+
+                List<String> allValuesFilesPath = getAllValueFilesPath(project);
                 List<LineMatchResult> allMatchLines = findAttrName(allValuesFilesPath, elementName);
 
                 if (allMatchLines.size() == 0) {
@@ -84,9 +88,27 @@ public class FindAttrValueAction extends CodeInsightAction {
         };
     }
 
+    private List<String> getAllValueFilesPath(Project project) {
+        List<String> results = new ArrayList<>();
+        List<String> valuesDirs = Configuration.getValuesDir(project);
+        for (String valuesDir : valuesDirs) {
+            VirtualFile virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(valuesDir);
+            if (virtualFile != null) {
+                PsiDirectory directory = PsiDirectoryFactory.getInstance(project).createDirectory(virtualFile);
+                PsiFile[] files = directory.getFiles();
+                for (PsiFile file : files) {
+                    if (file.getName().endsWith(".xml")) {
+                        results.add(file.getVirtualFile().getPath());
+                    }
+                }
+            }
+        }
+        return results;
+    }
+
     private
     @NotNull
-    List<LineMatchResult> findAttrName(Set<String> resFiles, String attrName) {
+    List<LineMatchResult> findAttrName(List<String> resFiles, String attrName) {
         Logger.debug("[findAttrName] attrName = " + attrName);
 
         if (!attrName.startsWith("?attr/")) {
