@@ -18,8 +18,8 @@ public class ModulesUtil {
         this.project = project;
     }
 
-    public Set<String> getModules() {
-        Set<String> modules = new HashSet<String>();
+    private Set<String> getModules() {
+        Set<String> modules = new HashSet<>();
         PsiDirectory baseDir = PsiDirectoryFactory.getInstance(project).createDirectory(project.getBaseDir());
         if (isAndroidProject(baseDir)) {
             Logger.debug(project.getName() + " is an Android project");
@@ -27,7 +27,6 @@ public class ModulesUtil {
             for (PsiDirectory dir : dirs) {
                 if (!dir.getName().equals("build") && !dir.getName().equals("gradle")) {
                     if (isModule(dir)) {
-                        Logger.debug(dir.getName() + " is a Module");
                         modules.add(dir.getName());
                     }
                 }
@@ -60,24 +59,6 @@ public class ModulesUtil {
             }
         }
         return valuesDirs;
-    }
-
-    public PsiDirectory getResDir(String moduleName) {
-        PsiDirectory baseDir = PsiDirectoryFactory.getInstance(project).createDirectory(project.getBaseDir());
-        PsiDirectory moduleDir = baseDir.findSubdirectory(moduleName);
-        if (moduleDir != null && moduleDir.isDirectory()) {
-            PsiDirectory srcDir = moduleDir.findSubdirectory("src");
-            if (srcDir != null && srcDir.isDirectory()) {
-                PsiDirectory mainDir = srcDir.findSubdirectory("main");
-                if (mainDir != null && mainDir.isDirectory()) {
-                    PsiDirectory resDir = mainDir.findSubdirectory("res");
-                    if (resDir != null && resDir.isDirectory()) {
-                        return resDir;
-                    }
-                }
-            }
-        }
-        return null;
     }
 
     private boolean isAndroidProject(PsiDirectory directory) {

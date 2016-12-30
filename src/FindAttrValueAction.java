@@ -7,22 +7,12 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.MessageType;
-import com.intellij.openapi.ui.popup.Balloon;
-import com.intellij.openapi.ui.popup.BalloonBuilder;
-import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.VirtualFileManager;
-import com.intellij.openapi.wm.ToolWindowManager;
-import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.impl.file.PsiDirectoryFactory;
-import com.intellij.ui.awt.RelativePoint;
 import org.jetbrains.annotations.NotNull;
 import util.Logger;
-import util.ModulesUtil;
 
 import java.awt.*;
 import java.io.BufferedReader;
@@ -31,7 +21,6 @@ import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,8 +38,6 @@ public class FindAttrValueAction extends CodeInsightAction {
 
                 Logger.init("chant", Logger.DEBUG);
 
-                ModulesUtil modulesUtil = new ModulesUtil(project);
-
                 int caretOffset = editor.getCaretModel().getOffset();
                 PsiElement psiElement = psiFile.findElementAt(caretOffset);
                 if (psiElement == null) {
@@ -58,15 +45,22 @@ public class FindAttrValueAction extends CodeInsightAction {
                     return;
                 }
 
-                String elementName = psiElement.getText();
+                String elementText = psiElement.getText(); // 期望的值是 ?attr/xxxx
 
-                List<String> allValuesFilesPath = getAllValueFilesPath(project);
-                List<LineMatchResult> allMatchLines = findAttrName(allValuesFilesPath, elementName);
+                if (!elementText.startsWith("?attr/")) {
+                    Logger.error("Error: attrName(" + elementText + ") is not starts with ?attr/");
+                    return;
+                }
+
+                String attrName = elementText.replace("?attr/", "");
+
+                List<String> allValuesFilesPath = Configuration.getAllValueFilesPath(project);
+                List<LineMatchResult> allMatchLines = findAttrName(allValuesFilesPath, attrName);
 
                 if (allMatchLines.size() == 0) {
                     NotificationGroup NOTIFICATION_GROUP = NotificationGroup.balloonGroup("chant");
                     NOTIFICATION_GROUP.createNotification("chant 报错",
-                            "没有找到 " + elementName + " 的赋值位置",
+                            "没有找到 " + elementText + " 的赋值位置",
                             NotificationType.ERROR,
                             null
                     ).notify(project);
@@ -88,35 +82,10 @@ public class FindAttrValueAction extends CodeInsightAction {
         };
     }
 
-    private List<String> getAllValueFilesPath(Project project) {
-        List<String> results = new ArrayList<>();
-        List<String> valuesDirs = Configuration.getValuesDir(project);
-        for (String valuesDir : valuesDirs) {
-            VirtualFile virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(valuesDir);
-            if (virtualFile != null) {
-                PsiDirectory directory = PsiDirectoryFactory.getInstance(project).createDirectory(virtualFile);
-                PsiFile[] files = directory.getFiles();
-                for (PsiFile file : files) {
-                    if (file.getName().endsWith(".xml")) {
-                        results.add(file.getVirtualFile().getPath());
-                    }
-                }
-            }
-        }
-        return results;
-    }
-
     private
     @NotNull
     List<LineMatchResult> findAttrName(List<String> resFiles, String attrName) {
         Logger.debug("[findAttrName] attrName = " + attrName);
-
-        if (!attrName.startsWith("?attr/")) {
-            Logger.error("Error: attrName(" + attrName + ") is not starts with ?attr/");
-            return Collections.emptyList();
-        } else {
-            attrName = attrName.replace("?attr/", "");
-        }
 
         //  1. 遍历所有文件的所有行找<item name="attrName">***</item>
         //  2. 如果只有一个结果，直接跳转到这个文件的这一行

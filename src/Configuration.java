@@ -7,10 +7,12 @@ import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
-import com.intellij.ui.popup.list.ListPopupImpl;
+import com.intellij.psi.impl.file.PsiDirectoryFactory;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -49,12 +51,12 @@ public class Configuration implements Configurable {
     @Nullable
     @Override
     public JComponent createComponent() {
-        valuesFolderList.addListSelectionListener(e -> {
-        });
+        valuesDirsPath = getValuesDir(getProject());
         addButton.addActionListener(e -> {
             PsiDirectory dir = showDirChooser(getProject());
             if (dir != null) {
-                valuesDirsPath.add(0, dir.getVirtualFile().getPath());
+                String filePath = dir.getVirtualFile().getPath();
+                valuesDirsPath.add(0, filePath);
                 notifyList();
                 valuesFolderList.setSelectedIndex(0);
                 isModified = true;
@@ -69,10 +71,12 @@ public class Configuration implements Configurable {
     }
 
     private void notifyList() {
+        // TODO chant 通知 List 更新的方法是这样吗？
         valuesFolderList.setListData(valuesDirsPath.toArray());
     }
 
     private Project getProject() {
+        // TODO chant 让 ProjectUtil 去 "guess" 似乎不太好
         return ProjectUtil.guessCurrentProject(root);
     }
 
@@ -122,7 +126,7 @@ public class Configuration implements Configurable {
 
     private static
     @NotNull
-    List<String> getCustomValuesDirProperty(Project project) {
+    List<String> getCustomValuesDir(Project project) {
         PropertiesComponent properties = PropertiesComponent.getInstance(project);
         String valuesString = properties.getValue(CUSTOM_VALUES_DIR_KEY, "");
         String[] dirs = valuesString.split(CUSTOM_VALUES_DIR_SEPARATOR);
@@ -139,8 +143,8 @@ public class Configuration implements Configurable {
         return valuesDirsPath;
     }
 
-    public static List<String> getValuesDir(Project project) {
-        List<String> dirs = getCustomValuesDirProperty(project);
+    private static List<String> getValuesDir(Project project) {
+        List<String> dirs = getCustomValuesDir(project);
         if (dirs.size() > 0) {
             // 有设置过
             return dirs;
@@ -149,5 +153,24 @@ public class Configuration implements Configurable {
             return getDefaultValuesDir(project);
         }
     }
+
+    static List<String> getAllValueFilesPath(Project project) {
+        List<String> results = new ArrayList<>();
+        List<String> valuesDirs = getValuesDir(project);
+        for (String valuesDir : valuesDirs) {
+            VirtualFile virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(valuesDir);
+            if (virtualFile != null) {
+                PsiDirectory directory = PsiDirectoryFactory.getInstance(project).createDirectory(virtualFile);
+                PsiFile[] files = directory.getFiles();
+                for (PsiFile file : files) {
+                    if (file.getName().endsWith(".xml")) {
+                        results.add(file.getVirtualFile().getPath());
+                    }
+                }
+            }
+        }
+        return results;
+    }
+
 
 }
