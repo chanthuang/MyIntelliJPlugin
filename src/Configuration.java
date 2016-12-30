@@ -133,7 +133,11 @@ public class Configuration implements Configurable {
             return null;
         } else {
             String[] dirs = valuesString.split(CUSTOM_VALUES_DIR_SEPARATOR);
-            return Arrays.asList(dirs);
+            List<String> result = new ArrayList<>();
+            for (String dir : dirs) {
+                result.add(dir);
+            }
+            return result;
         }
     }
 
