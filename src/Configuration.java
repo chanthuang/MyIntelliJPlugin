@@ -125,12 +125,16 @@ public class Configuration implements Configurable {
     }
 
     private static
-    @NotNull
+    @Nullable
     List<String> getCustomValuesDir(Project project) {
         PropertiesComponent properties = PropertiesComponent.getInstance(project);
         String valuesString = properties.getValue(CUSTOM_VALUES_DIR_KEY, "");
-        String[] dirs = valuesString.split(CUSTOM_VALUES_DIR_SEPARATOR);
-        return Arrays.asList(dirs);
+        if (valuesString.isEmpty()) {
+            return null;
+        } else {
+            String[] dirs = valuesString.split(CUSTOM_VALUES_DIR_SEPARATOR);
+            return Arrays.asList(dirs);
+        }
     }
 
     private static List<String> getDefaultValuesDir(Project project) {
@@ -145,7 +149,7 @@ public class Configuration implements Configurable {
 
     private static List<String> getValuesDir(Project project) {
         List<String> dirs = getCustomValuesDir(project);
-        if (dirs.size() > 0) {
+        if (dirs != null && dirs.size() > 0) {
             // 有设置过
             return dirs;
         } else {
