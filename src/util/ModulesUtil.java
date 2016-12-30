@@ -1,18 +1,18 @@
 package util;
 
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.google.common.base.Joiner;
+import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.impl.file.PsiDirectoryFactory;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class ModulesUtil {
@@ -42,19 +42,81 @@ public class ModulesUtil {
         return modules;
     }
 
-    public
-    @Nullable
-    String getCurrentModule() {
-        Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
-        String path = FileDocumentManager.getInstance().getFile(editor.getDocument()).getPath();
-        VirtualFile virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(path.substring(0, path.indexOf("/src")));
-        if (virtualFile != null && virtualFile.isDirectory()) {
-            PsiDirectory directory = PsiDirectoryFactory.getInstance(project).createDirectory(virtualFile);
-            if (isModule(directory)) {
-                return directory.getName();
+    private Set<PsiDirectory> getModuleValuesDir() {
+        Set<PsiDirectory> valuesDirs = new HashSet<>();
+        Set<String> modules = getModules();
+        for (String moduleName : modules) {
+            PsiDirectory baseDir = PsiDirectoryFactory.getInstance(project).createDirectory(project.getBaseDir());
+            PsiDirectory moduleDir = baseDir.findSubdirectory(moduleName);
+            if (moduleDir != null && moduleDir.isDirectory()) {
+                PsiDirectory srcDir = moduleDir.findSubdirectory("src");
+                if (srcDir != null && srcDir.isDirectory()) {
+                    PsiDirectory mainDir = srcDir.findSubdirectory("main");
+                    if (mainDir != null && mainDir.isDirectory()) {
+                        PsiDirectory resDir = mainDir.findSubdirectory("res");
+                        if (resDir != null && resDir.isDirectory()) {
+                            PsiDirectory valuesDir = resDir.findSubdirectory("values");
+                            if (valuesDir != null && valuesDir.isDirectory()) {
+                                valuesDirs.add(valuesDir);
+                            }
+                        }
+                    }
+                }
             }
         }
-        return null;
+        return valuesDirs;
+    }
+
+    private static final String CUSTOM_VALUES_DIR_KEY = "CustomValuesDirKey";
+    private static final String CUSTOM_VALUES_DIR_SEPARATOR = "_customValuesDirSeparator_";
+
+    public void setCustomValuesDirProperty(@Nullable List<String> filePaths) {
+        PropertiesComponent properties = PropertiesComponent.getInstance(project);
+        if (filePaths != null && filePaths.size() > 0) {
+            String value = Joiner.on(CUSTOM_VALUES_DIR_SEPARATOR).join(filePaths);
+            properties.setValue(CUSTOM_VALUES_DIR_KEY, value);
+        } else {
+            if (properties.isValueSet(CUSTOM_VALUES_DIR_KEY)) {
+                properties.unsetValue(CUSTOM_VALUES_DIR_KEY);
+            }
+        }
+    }
+
+    public
+    @NotNull
+    String[] getCustomValuesDirProperty() {
+        PropertiesComponent properties = PropertiesComponent.getInstance(project);
+        String valuesString = properties.getValue(CUSTOM_VALUES_DIR_KEY, "");
+        return valuesString.split(CUSTOM_VALUES_DIR_KEY);
+    }
+
+    private Set<PsiDirectory> getCustomValuesDir() {
+        Set<PsiDirectory> valuesDirs = new HashSet<>();
+        String[] filePaths = getCustomValuesDirProperty();
+        for (String filePath : filePaths) {
+            if (filePath != null && filePath.length() > 0) {
+                VirtualFile valuesDir = LocalFileSystem.getInstance().findFileByPath(filePath);
+                if (valuesDir != null && valuesDir.isDirectory()) {
+                    valuesDirs.add(PsiDirectoryFactory.getInstance(project).createDirectory(valuesDir));
+                }
+            }
+        }
+        return valuesDirs;
+    }
+
+    public Set<String> getAllValueFilesPath() {
+        Set<String> results = new HashSet<>();
+        Set<PsiDirectory> valuesDirs = getModuleValuesDir();
+        valuesDirs.addAll(getCustomValuesDir());
+        for (PsiDirectory valuesDir : valuesDirs) {
+            PsiFile[] files = valuesDir.getFiles();
+            for (PsiFile file : files) {
+                if (file.getName().endsWith(".xml")) {
+                    results.add(file.getVirtualFile().getPath());
+                }
+            }
+        }
+        return results;
     }
 
     public PsiDirectory getResDir(String moduleName) {
@@ -73,95 +135,6 @@ public class ModulesUtil {
             }
         }
         return null;
-    }
-
-    public Set<String> getAllValueFilesPath() {
-        Set<String> results = new HashSet<>();
-        Set<String> modules = getModules();
-        for (String moduleName : modules) {
-            PsiDirectory baseDir = PsiDirectoryFactory.getInstance(project).createDirectory(project.getBaseDir());
-            PsiDirectory moduleDir = baseDir.findSubdirectory(moduleName);
-            if (moduleDir != null && moduleDir.isDirectory()) {
-                PsiDirectory srcDir = moduleDir.findSubdirectory("src");
-                if (srcDir != null && srcDir.isDirectory()) {
-                    PsiDirectory mainDir = srcDir.findSubdirectory("main");
-                    if (mainDir != null && mainDir.isDirectory()) {
-                        PsiDirectory resDir = mainDir.findSubdirectory("res");
-                        if (resDir != null && resDir.isDirectory()) {
-                            PsiDirectory valuesDir = resDir.findSubdirectory("values");
-                            if (valuesDir != null && valuesDir.isDirectory()) {
-                                PsiFile[] files = valuesDir.getFiles();
-                                for (PsiFile file : files) {
-                                    if (file.getName().endsWith(".xml")) {
-                                        results.add(file.getVirtualFile().getPath());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return results;
-    }
-
-    public PsiDirectory getOrCreateDrawableDir(String moduleName, String dirName) {
-        PsiDirectory baseDir = PsiDirectoryFactory.getInstance(project).createDirectory(project.getBaseDir());
-        PsiDirectory moduleDir = baseDir.findSubdirectory(moduleName);
-        if (moduleDir != null) {
-            PsiDirectory srcDir = moduleDir.findSubdirectory("src");
-            if (srcDir == null) {
-                srcDir = moduleDir.createSubdirectory("src");
-                Logger.debug("Creating dir :" + srcDir.getName());
-            }
-
-            PsiDirectory mainDir = srcDir.findSubdirectory("main");
-            if (mainDir == null) {
-                mainDir = srcDir.createSubdirectory("main");
-                Logger.debug("Creating dir :" + mainDir.getName());
-            }
-
-            PsiDirectory resDir = mainDir.findSubdirectory("res");
-            if (resDir == null) {
-                resDir = mainDir.createSubdirectory("res");
-                Logger.debug("Creating dir :" + resDir.getName());
-            }
-
-            PsiDirectory drawableDir = resDir.findSubdirectory(dirName);
-            if (drawableDir == null) {
-                drawableDir = resDir.createSubdirectory(dirName);
-                Logger.debug("Creating dir :" + drawableDir.getName());
-            }
-            return drawableDir;
-        }
-        return null;
-    }
-
-    public Set<String> getDrawableDirs(PsiDirectory resDir) {
-        Set<String> dirs = new HashSet<String>();
-        if (resDir != null) {
-            PsiDirectory[] subdirs = resDir.getSubdirectories();
-            for (PsiDirectory dir : subdirs) {
-                if (dir.getName().contains("drawable")) {
-                    dirs.add(dir.getName());
-                }
-            }
-        }
-        return dirs;
-    }
-
-    public Set<String> getExistDpiDirs(String moduleName) {
-        Set<String> dpis = new HashSet<String>();
-        if (moduleName != null) {
-            for (String s : getDrawableDirs(getResDir(moduleName))) {
-                if (s.equals("drawable")) {
-                    dpis.add("nodpi");
-                } else {
-                    dpis.add(s.split("-")[1]);
-                }
-            }
-        }
-        return dpis;
     }
 
     private boolean isAndroidProject(PsiDirectory directory) {
